@@ -76,6 +76,61 @@ cd ../shop-search
 git worktree remove ../shop-hotfix
 ```
 
+## Review a PR in a fresh worktree
+
+A reviewer-friendly shell function: give it a remote branch name and it fetches, creates a worktree for that branch, and drops you inside it. Re-running it for the same branch just jumps back to the existing worktree.
+
+Add to `~/.zshrc` (or `~/.bashrc`):
+
+```sh
+# prwt <remote-branch> [<dir>] — open a PR branch in a worktree and cd into it
+prwt() {
+   local branch="${1#origin/}"
+   local dir="${2:-../${branch//\//-}}"
+   local existing
+
+   # 1) Already checked out in a worktree? Just go there.
+   existing=$(git worktree list | grep -F "[$branch]" | awk '{print $1}' | head -n 1)
+   if [ -n "$existing" ]; then
+     echo "prwt: $branch is already checked out at $existing"
+     cd "$existing" && return 0
+   fi
+
+   # 2) Make sure the remote branch is up to date.
+   git fetch origin "$branch" || { echo "prwt: could not fetch origin/$branch"; return 1; }
+
+   # 3) Create the worktree. If a local branch of the same name exists,
+   #    point it at the freshly fetched remote branch (-B) so the review
+   #    always starts from the PR head.
+   if git show-ref --verify --quiet "refs/heads/$branch"; then
+     git worktree add -B "$branch" "$dir" "origin/$branch" || return 1
+     git -C "$dir" branch --set-upstream-to="origin/$branch" 2>/dev/null || true
+   else
+     git worktree add -b "$branch" --track "$dir" "origin/$branch" || return 1
+   fi
+
+   echo "prwt: $branch is ready at $dir"
+   cd "$dir"
+ }
+```
+
+Usage — from your main checkout, in any repository:
+
+```sh
+prwt feature/search          # fetch, create ../feature-search, cd into it
+prwt origin/feature/search   # the origin/ prefix is optional
+prwt feature/search /tmp/review   # custom directory
+prwt feature/search          # run again later: jumps to the existing worktree
+```
+
+Behavior worth knowing:
+
+- **Always starts from the PR head.** `prwt` fetches first, and if a stale local branch of the same name exists, `-B` resets it to the fetched remote branch.
+- **Tracking is set up**, so `git pull` inside the worktree picks up the author's new pushes.
+- **Idempotent.** If the branch is already checked out in a worktree, `prwt` just `cd`s there — it never creates a duplicate.
+- **Safe failure.** An unknown branch stops with an error before anything is created.
+- **Directory naming:** `feature/search` becomes `../feature-search` (slashes become dashes); pass a second argument to override the location.
+
 ## Aliases worth setting up
 
 Aliases turn `git worktree ...` into short, memorable commands. Two kinds: **Git aliases** (configure once, work in every repo) and **shell functions** (for things Git aliases cannot do, like changing directory).
