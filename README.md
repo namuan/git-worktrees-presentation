@@ -10,7 +10,7 @@ https://namuan.github.io/git-worktrees-presentation/
 
 ## Cheatsheet
 
-Looking for commands rather than the presentation? See the [Git worktrees command cheatsheet](CHEATSHEET.md).
+Looking for commands rather than the presentation? See the [Git worktrees command cheatsheet](CHEATSHEET.md) — commands plus easy-to-remember aliases.
 
 ## Learning objective
 

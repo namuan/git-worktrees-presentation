@@ -76,6 +76,73 @@ cd ../shop-search
 git worktree remove ../shop-hotfix
 ```
 
+## Aliases worth setting up
+
+Aliases turn `git worktree ...` into short, memorable commands. Two kinds: **Git aliases** (configure once, work in every repo) and **shell functions** (for things Git aliases cannot do, like changing directory).
+
+### Git aliases
+
+```sh
+# The big one: wt = worktree
+git config --global alias.wt worktree
+
+# Now these work:
+git wt list
+git wt add -b feature/search ../shop-search main
+git wt remove ../shop-hotfix
+```
+
+More specific shortcuts, if you prefer:
+
+```sh
+git config --global alias.wtl 'worktree list'
+git config --global alias.wtr 'worktree remove'
+git config --global alias.wtp 'worktree prune'
+```
+
+### One-command new worktree (`!` aliases run a shell snippet)
+
+```sh
+# git wtn <branch> -> creates the branch AND ../<branch> worktree in one step
+git config --global alias.wtn '!f() { git worktree add -b "$1" "../$1"; }; f'
+
+git wtn feature/search   # == git worktree add -b feature/search ../feature/search
+```
+
+The `!` prefix means the rest runs in your shell, so you can script with `$1`, `$2`, and friends. Quote the arguments — branch names containing `/` are fine.
+
+### Jump to a worktree from anywhere (shell function)
+
+Git aliases cannot change the current directory, so this lives in `~/.zshrc` (or `~/.bashrc`):
+
+```sh
+# gwt <branch> — cd into the worktree that has <branch> checked out
+gwt() {
+   local dir
+   dir=$(git worktree list | grep -F "[$1]" | awk '{print $1}' | head -n 1)
+   [ -n "$dir" ] && cd "$dir" || echo "No worktree found for branch: $1"
+ }
+```
+
+Usage:
+
+```sh
+gwt hotfix/login    # cd ../shop-hotfix
+gwt feature/search  # cd ../shop-search
+```
+
+`git worktree list` prints the checked-out branch in brackets (`[feature/search]`); `grep -F` matches that literal text, so `gwt` finds the right directory even when you are in a completely different folder.
+
+### Manage your aliases
+
+```sh
+git config --global --get-regexp '^alias\.wt'   # list your worktree aliases
+git config --global --unset alias.wtn           # remove one
+git config --global --edit                      # inspect or tweak everything
+```
+
+Aliases are personal configuration (`--global`); they are not shared with teammates unless you keep them in a dotfiles repo.
+
 ## Gotchas
 
 - **One branch, one worktree.** `git worktree add ../x main` fails with `fatal: 'main' is already checked out at '...'` while `main` is open elsewhere. Create a new branch instead — do not bypass this with `-f`.
