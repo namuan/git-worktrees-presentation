@@ -1,0 +1,15 @@
+{
+  "url": "http://127.0.0.1:4173",
+  "colorSchemes": ["light", "dark"],
+  "waitFor": "#worktree-lab",
+  "settle": 400,
+  "checks": [
+    { "label": "body uses the editorial DM Sans body face", "css": "body", "prop": "fontFamily", "contains": "DM Sans" },
+    { "label": "display heading uses Fraunces", "css": "h1", "prop": "fontFamily", "contains": "Fraunces" },
+    { "label": "primary lab action has a visible fill", "css": ".button--primary", "prop": "backgroundColor", "ne": "rgba(0, 0, 0, 0)" },
+    { "label": "progress indicator has a visible fill", "css": ".nav-progress", "prop": "backgroundColor", "ne": "rgba(0, 0, 0, 0)" }
+  ],
+  "noOverflow": true,
+  "noArtifacts": true,
+  "noErrors": true
+}

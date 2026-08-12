@@ -1,0 +1,20 @@
+{
+  "url": "http://127.0.0.1:4173",
+  "timeout": 15000,
+  "viewport": { "width": 1440, "height": 900 },
+  "steps": [
+    { "wait": "#worktree-lab" },
+    { "expect": { "label": "deck contains thirteen slides", "count": { "sel": ".slide", "eq": 13 } } },
+    { "expect": { "label": "walkthrough begins at first step", "text": { "sel": "#lab-step-label", "contains": "step 1 of 5" } } },
+    { "click": "#step" },
+    { "sleep": 150 },
+    { "expect": { "label": "step control updates walkthrough state", "text": { "sel": "#lab-step-label", "contains": "step 2 of 5" } } },
+    { "click": "#play" },
+    { "sleep": 350 },
+    { "click": "#pause" },
+    { "click": "#reset" },
+    { "expect": { "label": "reset restores walkthrough state", "text": { "sel": "#lab-step-label", "contains": "step 1 of 5" } } },
+    { "expect": { "label": "no browser errors", "noErrors": true } },
+    { "expect": { "label": "no horizontal overflow", "noOverflow": true } }
+  ]
+}

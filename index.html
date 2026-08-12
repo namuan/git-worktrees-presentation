@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An interactive presentation explaining Git worktrees.">
+  <title>Git worktrees — parallel branches, one repository</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #f4f0e7;
+      --paper-deep: #e9e1d1;
+      --ink: #172b3a;
+      --muted: #5e6870;
+      --line: rgba(23, 43, 58, .16);
+      --line-strong: rgba(23, 43, 58, .34);
+      --navy: #173a56;
+      --blue: #247197;
+      --red: #bb4b3e;
+      --red-wash: #f1d9d1;
+      --ochre: #b67b20;
+      --green: #42755d;
+      --green-wash: #dce9df;
+      --white: #fbf9f3;
+      --font: "DM Sans", sans-serif;
+      --display: "Fraunces", Georgia, serif;
+      --mono: "IBM Plex Mono", monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #17242d;
+        --paper-deep: #21333c;
+        --ink: #edf0e8;
+        --muted: #b5c1bc;
+        --line: rgba(237, 240, 232, .15);
+        --line-strong: rgba(237, 240, 232, .34);
+        --navy: #9bc6d9;
+        --blue: #77b7d3;
+        --red: #e68e7e;
+        --red-wash: #47332e;
+        --ochre: #edc36b;
+        --green: #8fc5a0;
+        --green-wash: #294238;
+        --white: #1d2c35;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink); }
+    body { font-family: var(--font); overflow: hidden; }
+    a { color: inherit; text-decoration-color: var(--ochre); text-underline-offset: .16em; }
+    button, select { font: inherit; }
+    button:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--ochre); outline-offset: 3px; }
+
+    .deck { height: 100dvh; overflow-y: auto; scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+    .slide { min-height: 100dvh; height: 100dvh; overflow: hidden; scroll-snap-align: start; padding: clamp(42px, 7vh, 88px) clamp(28px, 8vw, 132px); position: relative; display: flex; flex-direction: column; justify-content: center; isolation: isolate; }
+    .slide::before { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: -1; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 44px 44px; opacity: .22; }
+    .slide:nth-child(3n)::after { content: ""; position: absolute; width: min(45vw, 600px); aspect-ratio: 1; border: 1px solid var(--line); border-radius: 50%; right: -18vw; top: -20vw; z-index: -1; }
+    .slide--ink { color: #eef0e9; background: var(--navy); }
+    .slide--ink::before { background-image: linear-gradient(rgba(238,240,233,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(238,240,233,.12) 1px, transparent 1px); opacity: .32; }
+    .slide--ink .eyebrow, .slide--ink .subtitle, .slide--ink .small { color: #c8d6d3; }
+    .slide--ink .marker { background: var(--ochre); }
+    .slide--ink .card, .slide--ink .lab-panel { background: rgba(10, 25, 37, .25); border-color: rgba(238,240,233,.2); }
+    .slide--ink .lab-log, .slide--ink .why-card { color: #c8d6d3; }
+    .slide--ink code { background: rgba(238,240,233,.12); color: #fff7dd; }
+
+    .eyebrow { display: flex; align-items: center; gap: 10px; color: var(--blue); font-family: var(--mono); font-size: clamp(10px, 1.1vw, 13px); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+    .marker { width: 8px; height: 8px; background: var(--red); transform: rotate(45deg); flex: 0 0 auto; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font: 600 clamp(54px, 9.5vw, 144px)/.9 var(--display); letter-spacing: -.055em; max-width: 10ch; }
+    h2 { font: 600 clamp(34px, 5vw, 70px)/.98 var(--display); letter-spacing: -.045em; max-width: 18ch; }
+    h3 { font-size: clamp(16px, 1.7vw, 23px); line-height: 1.15; }
+    .lead { max-width: 38rem; margin-top: clamp(18px, 3vh, 32px); color: var(--muted); font-size: clamp(17px, 2vw, 26px); line-height: 1.45; }
+    .slide--ink .lead { color: #d7dfdc; }
+    .subtitle, .small { font-family: var(--mono); font-size: clamp(11px, 1.2vw, 15px); letter-spacing: .035em; color: var(--muted); }
+    .small { line-height: 1.55; }
+    .title-top { position: absolute; top: clamp(24px, 4vh, 48px); left: clamp(28px, 8vw, 132px); right: clamp(28px, 8vw, 132px); display: flex; justify-content: space-between; }
+    .title-rule { width: min(18vw, 220px); height: 1px; background: currentColor; opacity: .55; margin: clamp(22px, 4vh, 42px) 0; }
+    .stamp { position: absolute; right: clamp(34px, 10vw, 180px); bottom: clamp(44px, 10vh, 130px); border: 2px solid var(--red); color: var(--red); transform: rotate(-8deg); padding: 13px 16px 10px; font: 600 clamp(13px, 1.4vw, 18px)/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+
+    .section-number { position: absolute; right: clamp(32px, 8vw, 132px); top: clamp(26px, 6vh, 72px); color: var(--line-strong); font: 500 clamp(120px, 25vw, 360px)/.8 var(--display); letter-spacing: -.1em; z-index: -1; }
+    .divider h2 { max-width: 11ch; }
+    .divider .lead { max-width: 29rem; }
+
+    .split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(280px, .9fr); align-items: center; gap: clamp(30px, 7vw, 110px); width: 100%; }
+    .split--visual-first { grid-template-columns: minmax(280px, .85fr) minmax(0, 1.15fr); }
+    .stack { display: grid; gap: 14px; margin-top: clamp(22px, 4vh, 42px); }
+    .fact { position: relative; padding: 14px 16px 14px 23px; border-top: 1px solid var(--line); color: var(--muted); font-size: clamp(15px, 1.55vw, 21px); line-height: 1.4; }
+    .fact::before { content: ""; position: absolute; left: 1px; top: 22px; width: 7px; height: 7px; background: var(--red); }
+    .fact strong { color: var(--ink); }
+    .slide--ink .fact { color: #d7dfdc; border-color: rgba(238,240,233,.22); }
+    .slide--ink .fact strong { color: #fff; }
+
+    .card { border: 1px solid var(--line-strong); background: color-mix(in srgb, var(--white) 76%, transparent); padding: clamp(18px, 2.6vw, 32px); min-width: 0; }
+    .card__label { color: var(--blue); font: 600 11px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .card p { color: var(--muted); margin-top: 11px; font-size: clamp(14px, 1.4vw, 18px); line-height: 1.5; }
+    .card strong { color: var(--ink); }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .cards .card:nth-child(2) { transform: translateY(24px); }
+    .cards .card:nth-child(3) { transform: translateY(8px); }
+
+    .world { width: 100%; max-width: 560px; padding: clamp(20px, 3vw, 36px); border: 1px solid var(--line-strong); background: var(--paper-deep); position: relative; }
+    .world::before { content: "shared repository"; position: absolute; left: 18px; top: -11px; padding: 4px 8px; background: var(--paper); color: var(--muted); font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .repo-core { padding: 14px; border: 2px solid var(--navy); color: var(--navy); font: 600 13px/1.4 var(--mono); }
+    .repo-core span { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; font-weight: 400; }
+    .world-line { width: 2px; height: 26px; margin: 0 auto; background: var(--navy); }
+    .trees { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+    .tree { min-height: 112px; padding: 12px 9px; border: 1px solid var(--line-strong); background: var(--white); position: relative; }
+    .tree::before { content: ""; position: absolute; left: 50%; top: -27px; height: 26px; border-left: 1px solid var(--navy); }
+    .tree .branch { font: 600 10px/1.2 var(--mono); color: var(--blue); overflow-wrap: anywhere; }
+    .tree p { margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .tree .head { display: inline-block; margin-top: 8px; padding: 3px 5px; background: var(--green-wash); color: var(--green); font: 600 9px/1 var(--mono); }
+
+    .pipeline { display: flex; align-items: stretch; margin-top: clamp(22px, 4vh, 40px); width: 100%; max-width: 1100px; }
+    .pipeline__step { flex: 1; min-width: 0; padding: clamp(15px, 2.4vw, 28px); border: 1px solid var(--line-strong); background: var(--white); }
+    .pipeline__step:nth-of-type(3) { background: var(--paper-deep); }
+    .pipeline__num { color: var(--red); font: 600 11px/1 var(--mono); }
+    .pipeline__name { margin-top: 12px; font: 600 clamp(16px, 1.9vw, 25px)/1.05 var(--display); }
+    .pipeline__text { margin-top: 9px; color: var(--muted); font-size: clamp(13px, 1.35vw, 17px); line-height: 1.45; }
+    .pipeline__arrow { display: flex; align-items: center; justify-content: center; flex: 0 0 clamp(25px, 4vw, 56px); color: var(--red); font-size: 25px; }
+
+    .terminal { background: #10212d; color: #e9eee8; border: 1px solid #244558; padding: clamp(18px, 2.8vw, 34px); font: clamp(12px, 1.3vw, 17px)/1.75 var(--mono); box-shadow: 12px 12px 0 color-mix(in srgb, var(--red) 70%, transparent); width: 100%; max-width: 690px; }
+    .terminal .dim { color: #92abb2; }
+    .terminal .cmd { color: #f0ca70; }
+    .terminal .success { color: #99d6a8; }
+    code { font-family: var(--mono); background: var(--paper-deep); color: var(--navy); padding: .12em .32em; overflow-wrap: anywhere; }
+
+    .rule { border-left: 7px solid var(--red); padding: 18px 20px; background: var(--red-wash); max-width: 850px; font-size: clamp(18px, 2.25vw, 30px); line-height: 1.25; }
+    .rule strong { font-family: var(--display); }
+    .two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: clamp(20px, 3vh, 30px); max-width: 1000px; }
+    .comparison { min-height: 180px; border-top: 5px solid var(--blue); padding: 18px 2px; }
+    .comparison:nth-child(2) { border-top-color: var(--ochre); }
+    .comparison p { margin-top: 12px; color: var(--muted); font-size: clamp(14px, 1.6vw, 20px); line-height: 1.45; }
+
+    .command-list { display: grid; grid-template-columns: 1.05fr .95fr; gap: clamp(24px, 5vw, 70px); align-items: center; }
+    .command-list ol { list-style: none; margin: clamp(22px, 3vh, 34px) 0 0; padding: 0; counter-reset: cmd; }
+    .command-list li { counter-increment: cmd; position: relative; padding: 0 0 18px 46px; color: var(--muted); font-size: clamp(15px, 1.55vw, 20px); line-height: 1.4; }
+    .command-list li::before { content: counter(cmd, decimal-leading-zero); position: absolute; left: 0; top: 0; color: var(--red); font: 600 13px/1 var(--mono); }
+    .command-list li strong { color: var(--ink); }
+
+    .lab { width: 100%; max-width: 1160px; margin-top: clamp(14px, 2.5vh, 24px); display: grid; grid-template-columns: 1.6fr .68fr; gap: 14px; }
+    .lab-panel { background: var(--white); border: 1px solid var(--line-strong); padding: clamp(16px, 2.2vw, 25px); min-width: 0; }
+    .lab-header { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+    .lab-title { font: 600 clamp(17px, 2vw, 25px)/1 var(--display); }
+    .lab-state { color: var(--red); font: 600 10px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase; text-align: right; }
+    .story-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 14px 0 13px; }
+    .story-step { appearance: none; min-width: 0; border: 1px solid var(--line); background: transparent; color: var(--muted); padding: 7px 4px; cursor: pointer; font: 600 9px/1.2 var(--mono); letter-spacing: .03em; text-align: left; transition: background .18s, color .18s, border-color .18s; }
+    .story-step span { display: block; color: var(--red); margin-bottom: 3px; }
+    .story-step:hover, .story-step.active { background: var(--red); border-color: var(--red); color: #fffaf2; }
+    .story-step.active span { color: #fff0d0; }
+    .repo-map { position: relative; padding: 13px 12px 10px; background: color-mix(in srgb, var(--paper-deep) 82%, transparent); border: 1px solid var(--line); }
+    .repo-map::before { content: ""; position: absolute; height: 1px; background: var(--line-strong); top: 53px; left: 15%; right: 15%; z-index: 0; }
+    .repo-hub { position: relative; z-index: 1; width: max-content; max-width: 100%; margin: 0 auto 13px; padding: 6px 10px; background: var(--navy); color: #f8f3e8; font: 600 10px/1.2 var(--mono); letter-spacing: .04em; }
+    .worktree-cards { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+    .worktree-card { position: relative; min-height: 88px; padding: 9px; background: var(--white); border: 1px solid var(--line-strong); opacity: .54; transition: opacity .2s, transform .2s, border-color .2s, background .2s; }
+    .worktree-card::before { content: ""; display: block; height: 13px; width: 1px; margin: -23px auto 8px; background: var(--line-strong); }
+    .worktree-card.ready { opacity: .9; border-color: var(--blue); }
+    .worktree-card.active { opacity: 1; border-color: var(--green); transform: translateY(-2px); }
+    .worktree-card.alert { opacity: 1; border-color: var(--red); background: var(--red-wash); }
+    .worktree-card.done { opacity: 1; border-color: var(--ochre); background: color-mix(in srgb, var(--paper-deep) 70%, var(--ochre) 8%); }
+    .tree-branch { display: block; color: var(--blue); font: 600 10px/1.15 var(--mono); overflow-wrap: anywhere; }
+    .tree-path { display: block; min-height: 27px; margin-top: 5px; color: var(--muted); font: 10px/1.25 var(--mono); overflow-wrap: anywhere; }
+    .tree-chip { display: inline-block; margin-top: 8px; padding: 3px 5px; color: var(--green); background: var(--green-wash); font: 600 8px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+    .worktree-card.alert .tree-chip { color: var(--red); background: rgba(187,75,62,.12); }
+    .worktree-card.done .tree-chip { color: var(--ochre); background: rgba(182,123,32,.12); }
+    .lab-explanation { display: grid; grid-template-columns: 1.1fr .9fr; gap: 12px; margin-top: 12px; }
+    .scene-kicker { color: var(--red); font: 600 9px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; }
+    .scene-title { margin-top: 5px; font: 600 clamp(15px, 1.55vw, 20px)/1.08 var(--display); }
+    .lab-log { margin-top: 7px; border-left: 3px solid var(--ochre); padding: 2px 0 2px 10px; color: var(--muted); font-size: clamp(12px, 1.2vw, 15px); line-height: 1.38; }
+    .command-caption { color: var(--muted); font: 600 9px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .lab-command { display: block; margin-top: 6px; padding: 8px; background: #10212d; color: #f5cf78; font: clamp(10px, 1vw, 13px)/1.35 var(--mono); overflow-wrap: anywhere; }
+    .why-card { margin-top: 8px; padding: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: clamp(11px, 1.05vw, 13px); line-height: 1.35; }
+    .why-card strong { color: var(--ink); }
+    .lab-controls { display: grid; gap: 10px; align-content: center; }
+    .control-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .button { appearance: none; border: 1px solid var(--line-strong); background: transparent; color: inherit; padding: 10px 12px; cursor: pointer; font: 600 11px/1 var(--mono); letter-spacing: .035em; text-transform: uppercase; transition: background .16s, color .16s, transform .16s; }
+    .button:hover { background: var(--ink); color: var(--paper); transform: translateY(-1px); }
+    .button--primary { border-color: var(--red); background: var(--red); color: #fffaf2; }
+    .button--primary:hover { background: var(--red); color: #fffaf2; }
+    .speed-label { display: grid; gap: 6px; color: var(--muted); font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    select { border: 1px solid var(--line-strong); padding: 8px; color: var(--ink); background: var(--paper); }
+    .assistive { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+    .source-list { max-width: 960px; margin-top: clamp(22px, 4vh, 42px); border-top: 1px solid var(--line-strong); }
+    .source { display: grid; grid-template-columns: 38px 1fr; gap: 13px; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: clamp(13px, 1.3vw, 17px); line-height: 1.4; }
+    .source__num { color: var(--red); font: 600 12px/1.5 var(--mono); }
+    .source__text { color: var(--muted); }
+    .source__text a { color: var(--ink); }
+    .closing { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .55fr); gap: clamp(28px, 7vw, 100px); align-items: end; }
+    .checklist { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; font-size: clamp(14px, 1.5vw, 19px); color: var(--muted); }
+    .checklist li { position: relative; padding-left: 25px; }
+    .checklist li::before { content: ""; position: absolute; width: 11px; height: 6px; left: 0; top: .45em; border-left: 2px solid var(--green); border-bottom: 2px solid var(--green); transform: rotate(-45deg); }
+
+    .nav-progress { position: fixed; top: 0; left: 0; height: 4px; width: 0; background: var(--red); z-index: 10; transition: width .25s ease; }
+    .nav-count { position: fixed; right: 20px; bottom: 17px; z-index: 10; color: var(--muted); font: 600 11px/1 var(--mono); letter-spacing: .06em; }
+    .nav-hint { position: fixed; left: 20px; bottom: 17px; z-index: 10; color: var(--muted); font: 500 10px/1 var(--mono); letter-spacing: .04em; opacity: .8; transition: opacity .3s; }
+    .nav-hint.fade { opacity: 0; }
+    .nav-dots { position: fixed; z-index: 10; right: 18px; top: 50%; transform: translateY(-50%); display: grid; gap: 7px; }
+    .nav-dot { width: 8px; height: 8px; padding: 0; border: 1px solid var(--muted); border-radius: 50%; background: var(--paper); cursor: pointer; }
+    .nav-dot.active { background: var(--red); border-color: var(--red); transform: scale(1.35); }
+
+    .reveal { opacity: 0; transform: translateY(18px); transition: opacity .55s cubic-bezier(.16,1,.3,1), transform .55s cubic-bezier(.16,1,.3,1); }
+    .visible .reveal { opacity: 1; transform: none; }
+    .visible .reveal:nth-child(2) { transition-delay: .1s; } .visible .reveal:nth-child(3) { transition-delay: .18s; } .visible .reveal:nth-child(4) { transition-delay: .26s; }
+    @media (prefers-reduced-motion: reduce) { .deck { scroll-behavior: auto; } .reveal { opacity: 1; transform: none; transition: none; } }
+    @media (max-width: 760px) {
+      .slide { padding: 58px 27px 52px; }
+      .title-top { left: 27px; right: 27px; top: 21px; }
+      .split, .split--visual-first, .command-list, .lab, .closing { grid-template-columns: 1fr; gap: 22px; }
+      .cards { grid-template-columns: 1fr; }
+      .cards .card:nth-child(n) { transform: none; }
+      .world { max-width: none; }
+      .pipeline { display: grid; grid-template-columns: 1fr; gap: 0; }
+      .pipeline__arrow { height: 24px; transform: rotate(90deg); }
+      .two-up { gap: 5px; }
+      .lab-panel { padding: 16px; }
+      .lab-explanation { grid-template-columns: 1fr; }
+      .story-step { font-size: 8px; }
+      .nav-dots { display: none; }
+      .stamp { right: 32px; bottom: 55px; }
+    }
+    @media (max-height: 700px) { .slide { padding-top: 42px; padding-bottom: 38px; } .world { padding: 18px; } .tree { min-height: 90px; } .lead { margin-top: 14px; } .stack { margin-top: 18px; gap: 6px; } .fact { padding-top: 9px; padding-bottom: 9px; } .fact::before { top: 17px; } }
+    @media (max-height: 560px) { .slide { padding-top: 28px; padding-bottom: 30px; } h1 { font-size: clamp(42px, 7vw, 70px); } h2 { font-size: clamp(28px, 4vw, 42px); } .lead { font-size: 16px; } .nav-hint { display: none; } .pipeline__text, .card p { font-size: 12px; } }
+  </style>
+</head>
+<body>
+  <main class="deck" id="deck">
+    <section class="slide slide--ink visible" aria-labelledby="title">
+      <div class="title-top"><span class="eyebrow"><i class="marker"></i> Field guide 01</span><span class="subtitle">Git essentials</span></div>
+      <div class="reveal"><p class="subtitle">One repository · several focused desks</p></div>
+      <h1 id="title" class="reveal">Git<br>worktrees</h1>
+      <div class="title-rule reveal"></div>
+      <p class="lead reveal">Work on more than one branch at once, without repeatedly disturbing the directory already in progress.</p>
+      <div class="stamp" aria-hidden="true">parallel<br>by design</div>
+    </section>
+
+    <section class="slide divider" aria-labelledby="why">
+      <span class="section-number" aria-hidden="true">01</span>
+      <p class="eyebrow reveal"><i class="marker"></i> The friction</p>
+      <h2 id="why" class="reveal">Branch switching is a context switch.</h2>
+      <p class="lead reveal">A normal checkout replaces the files in your working directory. That is inconvenient when a feature is half-built and an urgent task arrives.</p>
+    </section>
+
+    <section class="slide" aria-labelledby="mental-model">
+      <div class="split">
+        <div>
+          <p class="eyebrow reveal"><i class="marker"></i> The mental model</p>
+          <h2 id="mental-model" class="reveal">One Git database. Several checked-out views.</h2>
+          <div class="stack">
+            <p class="fact reveal"><strong>The shared part:</strong> object database, refs and the common repository history.</p>
+            <p class="fact reveal"><strong>The separate part:</strong> each worktree has its own files, <code>HEAD</code> and index.</p>
+            <p class="fact reveal"><strong>The practical result:</strong> a branch can stay open in its own directory while you use another one.</p>
+          </div>
+        </div>
+        <div class="world reveal" aria-label="Diagram: a shared Git repository feeds three separate worktrees">
+          <div class="repo-core">.git — shared history<span>objects · refs · common config</span></div>
+          <div class="world-line"></div>
+          <div class="trees">
+            <div class="tree"><span class="branch">main</span><p>release work</p><span class="head">HEAD</span></div>
+            <div class="tree"><span class="branch">feature/search</span><p>feature work</p><span class="head">HEAD</span></div>
+            <div class="tree"><span class="branch">hotfix/login</span><p>urgent repair</p><span class="head">HEAD</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-labelledby="under-hood">
+      <p class="eyebrow reveal"><i class="marker"></i> What Git is managing</p>
+      <h2 id="under-hood" class="reveal">Separate desks; shared filing cabinet.</h2>
+      <div class="pipeline reveal" aria-label="Git worktree architecture pipeline">
+        <div class="pipeline__step"><div class="pipeline__num">01</div><div class="pipeline__name">Common directory</div><p class="pipeline__text">The repository’s shared objects and references remain in common storage.</p></div>
+        <div class="pipeline__arrow" aria-hidden="true">→</div>
+        <div class="pipeline__step"><div class="pipeline__num">02</div><div class="pipeline__name">Linked worktree admin</div><p class="pipeline__text">Git records administrative data for each linked worktree under the common Git directory.</p></div>
+        <div class="pipeline__arrow" aria-hidden="true">→</div>
+        <div class="pipeline__step"><div class="pipeline__num">03</div><div class="pipeline__name">Working files</div><p class="pipeline__text">Each directory exposes one checked-out revision and its own index.</p></div>
+      </div>
+      <p class="small reveal" style="margin-top:18px;max-width:900px;">A linked worktree normally contains a <code>.git</code> file that points to its administrative directory; it is not a second independent clone.</p>
+    </section>
+
+    <section class="slide slide--ink" aria-labelledby="create">
+      <div class="command-list">
+        <div>
+          <p class="eyebrow reveal"><i class="marker"></i> The starting move</p>
+          <h2 id="create" class="reveal">Add a directory and a branch together.</h2>
+          <ol>
+            <li class="reveal"><strong>Choose a sibling path.</strong> Keeping worktrees beside the main checkout makes them easy to spot and remove.</li>
+            <li class="reveal"><strong>Create a branch from a base.</strong> <code>-b</code> creates the branch if it does not exist.</li>
+            <li class="reveal"><strong>Open that path in your editor.</strong> It behaves like a normal checkout.</li>
+          </ol>
+        </div>
+        <div class="terminal reveal" aria-label="Example worktree creation command"><span class="dim"># while inside shop/</span><br><span class="cmd">git worktree add -b feature/search</span> <span class="success">../shop-search origin/main</span><br><br><span class="dim">Preparing worktree (new branch 'feature/search')</span><br><span class="dim">HEAD is now at …</span><br><br><span class="cmd">code ../shop-search</span></div>
+      </div>
+    </section>
+
+    <section class="slide" aria-labelledby="workflow">
+      <div class="split split--visual-first">
+        <div class="cards reveal">
+          <article class="card"><div class="card__label">01 · main</div><h3>Keep the baseline open</h3><p>Run the app, review a pull request or prepare a release without moving your feature checkout.</p></article>
+          <article class="card"><div class="card__label">02 · feature</div><h3>Keep momentum</h3><p>Dependencies, uncommitted changes and test output remain exactly where you left them.</p></article>
+          <article class="card"><div class="card__label">03 · hotfix</div><h3>Respond cleanly</h3><p>Create a small emergency branch without stashing or discarding your main task.</p></article>
+        </div>
+        <div>
+          <p class="eyebrow reveal"><i class="marker"></i> A useful pattern</p>
+          <h2 id="workflow" class="reveal">Use worktrees for genuinely parallel tasks.</h2>
+          <p class="lead reveal">The benefit is not “more branches.” It is preserving the state of more than one branch at a time.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-labelledby="guardrail">
+      <p class="eyebrow reveal"><i class="marker"></i> The guardrail</p>
+      <h2 id="guardrail" class="reveal">Git protects a branch from being checked out twice.</h2>
+      <div class="rule reveal"><strong>Normally, one branch has one active worktree.</strong> This avoids two directories independently changing the same branch’s <code>HEAD</code> and index state.</div>
+      <div class="two-up">
+        <div class="comparison reveal"><h3>What to do instead</h3><p>Create another branch for the other task, or use a detached worktree when you only need to inspect a commit.</p></div>
+        <div class="comparison reveal"><h3>Why it matters</h3><p>Worktrees make parallel editing safer by default. Do not defeat the protection just to reuse a branch name.</p></div>
+      </div>
+    </section>
+
+    <section class="slide" aria-labelledby="lifecycle">
+      <div class="split">
+        <div>
+          <p class="eyebrow reveal"><i class="marker"></i> A small lifecycle</p>
+          <h2 id="lifecycle" class="reveal">Add. List. Remove. Prune when needed.</h2>
+          <div class="stack">
+            <p class="fact reveal"><strong><code>git worktree list</code></strong> shows the registered paths and revisions.</p>
+            <p class="fact reveal"><strong><code>git worktree remove &lt;path&gt;</code></strong> removes a clean linked worktree; Git protects modified or untracked work unless forced.</p>
+            <p class="fact reveal"><strong><code>git worktree prune</code></strong> clears stale administrative records after a directory has disappeared outside Git.</p>
+          </div>
+        </div>
+        <div class="terminal reveal" aria-label="Example worktree lifecycle commands"><span class="cmd">git worktree list</span><br><span class="success">/code/shop         a18c… [main]</span><br><span class="success">/code/shop-search  c42e… [feature/search]</span><br><br><span class="cmd">git worktree remove ../shop-search</span><br><br><span class="cmd">git worktree prune</span> <span class="dim"># only if records are stale</span></div>
+      </div>
+    </section>
+
+    <section class="slide slide--ink" aria-labelledby="lab">
+      <p class="eyebrow reveal"><i class="marker"></i> Inspectable model</p>
+      <h2 id="lab" class="reveal">A three-worktree incident, step by step.</h2>
+      <div class="lab reveal" id="worktree-lab">
+        <div class="lab-panel">
+          <div class="lab-header"><span class="lab-title">One shared history, three separate desks</span><span class="lab-state" id="lab-step-label">step 1 of 5</span></div>
+          <div class="story-strip" id="story-strip" aria-label="Incident walkthrough steps"></div>
+          <div class="repo-map" aria-label="Visual map of the shared repository and three separate worktree directories">
+            <div class="repo-hub">shop/.git · shared commits &amp; refs</div>
+            <div class="worktree-cards">
+              <article class="worktree-card" data-tree="main"><span class="tree-branch">main</span><span class="tree-path">/code/shop</span><span class="tree-chip">baseline</span></article>
+              <article class="worktree-card" data-tree="feature"><span class="tree-branch">feature/search</span><span class="tree-path">/code/shop-search</span><span class="tree-chip">feature</span></article>
+              <article class="worktree-card" data-tree="hotfix"><span class="tree-branch">hotfix/login</span><span class="tree-path">/code/shop-hotfix</span><span class="tree-chip">not created</span></article>
+            </div>
+          </div>
+          <div class="lab-explanation">
+            <div><p class="scene-kicker" id="scene-kicker">what is happening</p><h3 class="scene-title" id="scene-title">Feature work stays open.</h3><p class="lab-log" id="lab-log" aria-live="polite"></p></div>
+            <div><p class="command-caption">Git action illustrated</p><code class="lab-command" id="lab-command"></code><p class="why-card" id="lab-why"></p></div>
+          </div>
+        </div>
+        <div class="lab-panel lab-controls">
+          <p class="small">Select a numbered phase or play the full incident. Highlighted desks have files checked out independently; the navy hub remains shared in every phase.</p>
+          <div class="control-row"><button class="button button--primary" id="play" type="button">Play</button><button class="button" id="pause" type="button">Pause</button></div>
+          <div class="control-row"><button class="button" id="step" type="button">Next step</button><button class="button" id="reset" type="button">Reset</button></div>
+          <label class="speed-label">Playback speed<select id="speed"><option value="1">Normal</option><option value="1.8">Fast</option><option value="0.55">Slow</option></select></label>
+          <p class="small">Illustrative only: this model narrates Git’s behavior; it does not run commands or represent review, deployment, or merge-conflict handling.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-labelledby="use-it">
+      <div class="split split--visual-first">
+        <div class="terminal reveal" aria-label="Command patterns for existing branch and detached worktree"><span class="dim"># an existing branch, if not checked out elsewhere</span><br><span class="cmd">git worktree add</span> <span class="success">../shop-hotfix hotfix/login</span><br><br><span class="dim"># inspect a commit without a branch</span><br><span class="cmd">git worktree add --detach</span> <span class="success">../shop-bisect v2.4.1</span><br><br><span class="dim"># make a worktree resistant to automatic pruning</span><br><span class="cmd">git worktree lock</span> <span class="success">--reason "external drive" ../shop-bisect</span></div>
+        <div>
+          <p class="eyebrow reveal"><i class="marker"></i> Match the tool to the job</p>
+          <h2 id="use-it" class="reveal">Three useful variants.</h2>
+          <div class="stack">
+            <p class="fact reveal"><strong>Existing branch:</strong> reopen work that already has a branch.</p>
+            <p class="fact reveal"><strong>Detached:</strong> build, test or investigate a specific commit without creating a branch.</p>
+            <p class="fact reveal"><strong>Locked:</strong> tell Git not to prune a worktree that is temporarily unavailable.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-labelledby="not-magic">
+      <p class="eyebrow reveal"><i class="marker"></i> Constraints worth remembering</p>
+      <h2 id="not-magic" class="reveal">A worktree isolates files, not every kind of state.</h2>
+      <div class="cards" style="margin-top:clamp(20px,4vh,38px);max-width:1080px;">
+        <article class="card reveal"><div class="card__label">Dependencies</div><h3>Each directory has its own files.</h3><p>Expect to install dependencies, build generated files or create local environment files in each worktree as your project requires.</p></article>
+        <article class="card reveal"><div class="card__label">Ports & services</div><h3>Running processes can collide.</h3><p>Two copies of the app may compete for the same port, database, cache or temporary directory.</p></article>
+        <article class="card reveal"><div class="card__label">Configuration</div><h3>Shared config is still shared by default.</h3><p>Use care with repository config and tooling that writes outside the worktree. Git supports per-worktree config when enabled.</p></article>
+      </div>
+      <p class="small reveal" style="margin-top:26px;max-width:850px;">Simplification disclosure: this deck shows the common linked-worktree model. Bare-repository workflows, sparse checkouts, submodules and project-specific tooling add important details.</p>
+    </section>
+
+    <section class="slide divider" aria-labelledby="takeaway">
+      <span class="section-number" aria-hidden="true">02</span>
+      <p class="eyebrow reveal"><i class="marker"></i> The takeaway</p>
+      <h2 id="takeaway" class="reveal">Keep the work that matters open.</h2>
+      <p class="lead reveal">Git worktrees reduce branch-switching friction by giving parallel branches independent directories while retaining one shared repository history.</p>
+    </section>
+
+    <section class="slide" aria-labelledby="sources">
+      <div class="closing">
+        <div>
+          <p class="eyebrow reveal"><i class="marker"></i> Sources & accuracy notes</p>
+          <h2 id="sources" class="reveal">Learn the command; keep the caveats.</h2>
+          <div class="source-list reveal">
+            <div class="source"><span class="source__num">01</span><div class="source__text"><a href="https://git-scm.com/docs/git-worktree">Git reference: git-worktree</a> — authoritative command syntax, add/list/remove/move/lock/prune behavior.</div></div>
+            <div class="source"><span class="source__num">02</span><div class="source__text"><a href="https://git-scm.com/docs/gitworktrees">Git reference: gitworktrees</a> — linked-worktree administration and configuration details.</div></div>
+            <div class="source"><span class="source__num">03</span><div class="source__text"><a href="https://git-scm.com/book/en/v2/Git-Tools-Advanced-Merging#_git_worktrees">Pro Git: Git worktrees</a> — conceptual workflow examples.</div></div>
+          </div>
+        </div>
+        <ul class="checklist reveal">
+          <li>Use a sibling directory convention.</li>
+          <li>One active branch per worktree.</li>
+          <li>Remove finished worktrees deliberately.</li>
+          <li>Run app instances with separate ports.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <div class="nav-progress" aria-hidden="true"></div>
+  <div class="nav-dots" aria-label="Slide navigation"></div>
+  <div class="nav-count" aria-live="polite">1 / 13</div>
+  <div class="nav-hint">scroll · arrow keys · swipe</div>
+
+  <script>
+    (() => {
+      const deck = document.getElementById('deck');
+      const slides = [...document.querySelectorAll('.slide')];
+      const progress = document.querySelector('.nav-progress');
+      const count = document.querySelector('.nav-count');
+      const dots = document.querySelector('.nav-dots');
+      const hint = document.querySelector('.nav-hint');
+      let current = 0;
+      slides.forEach((slide, index) => {
+        const dot = document.createElement('button');
+        dot.type = 'button'; dot.className = 'nav-dot'; dot.title = `Go to slide ${index + 1}`;
+        dot.setAttribute('aria-label', `Go to slide ${index + 1}`);
+        dot.addEventListener('click', () => slides[index].scrollIntoView({ behavior: 'smooth' }));
+        dots.appendChild(dot);
+      });
+      const dotItems = [...dots.children];
+      function update(index) {
+        current = index;
+        progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+        count.textContent = `${index + 1} / ${slides.length}`;
+        dotItems.forEach((dot, i) => dot.classList.toggle('active', i === index));
+      }
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) { entry.target.classList.add('visible'); update(slides.indexOf(entry.target)); }
+        });
+      }, { root: deck, threshold: .56 });
+      slides.forEach(slide => observer.observe(slide));
+      document.addEventListener('keydown', event => {
+        if (event.target.closest('button, select, input, textarea, a')) return;
+        if (['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(event.key)) { event.preventDefault(); slides[Math.min(current + 1, slides.length - 1)].scrollIntoView({ behavior: 'smooth' }); }
+        if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(event.key)) { event.preventDefault(); slides[Math.max(current - 1, 0)].scrollIntoView({ behavior: 'smooth' }); }
+        if (event.key === 'Home') { event.preventDefault(); slides[0].scrollIntoView({ behavior: 'smooth' }); }
+        if (event.key === 'End') { event.preventDefault(); slides.at(-1).scrollIntoView({ behavior: 'smooth' }); }
+        hint.classList.add('fade');
+      });
+      deck.addEventListener('wheel', () => hint.classList.add('fade'), { passive: true });
+      update(0);
+
+      const scenes = [
+        {
+          phase: 'Feature open', state: 'feature in progress', title: 'Feature work stays open.',
+          log: 'Search filters are half-built in /code/shop-search. The main directory has not been checked out, reset, or stashed.',
+          command: 'git worktree add -b feature/search ../shop-search main',
+          why: '<strong>What this makes visible:</strong> the feature gets its own files and index, while the commit history is still shared.',
+          trees: { main: ['ready', 'baseline ready'], feature: ['active', 'editing filters'], hotfix: ['', 'not created'] }
+        },
+        {
+          phase: 'Parallel checks', state: 'parallel testing', title: 'Two directories can answer two questions.',
+          log: 'Run the release baseline in /code/shop while feature tests run in /code/shop-search. Neither task needs a checkout.',
+          command: 'cd ../shop && npm test     # meanwhile: ../shop-search',
+          why: '<strong>What this makes visible:</strong> separate working files let two branches remain inspectable at the same time.',
+          trees: { main: ['active', 'run baseline'], feature: ['active', 'run feature tests'], hotfix: ['', 'not created'] }
+        },
+        {
+          phase: 'Incident', state: 'incident arrives', title: 'An urgent fix gets a third desk, not a branch switch.',
+          log: 'A login regression arrives. Instead of stashing feature changes and checking out main, create a new hotfix worktree from main.',
+          command: 'git worktree add -b hotfix/login ../shop-hotfix main',
+          why: '<strong>What this makes visible:</strong> feature/search stays exactly where it was; the new branch is attached to a new directory.',
+          trees: { main: ['ready', 'source branch'], feature: ['ready', 'parked safely'], hotfix: ['alert', 'create hotfix'] }
+        },
+        {
+          phase: 'Isolate fix', state: 'hotfix isolated', title: 'Only the hotfix directory changes.',
+          log: 'Edit and test the login repair in /code/shop-hotfix. The feature worktree keeps its unfinished files and test output intact.',
+          command: 'cd ../shop-hotfix && git add . && git commit -m "fix login"',
+          why: '<strong>What this makes visible:</strong> each worktree has its own checked-out files and index, so changing one does not rewrite another.',
+          trees: { main: ['ready', 'baseline ready'], feature: ['ready', 'feature untouched'], hotfix: ['active', 'fix + test'] }
+        },
+        {
+          phase: 'Clean up', state: 'cleanup', title: 'Finish through the normal branch workflow, then remove the desk.',
+          log: 'After review and merge, main contains the fix. Resume the feature immediately, then remove the clean hotfix directory when it is no longer useful.',
+          command: 'git worktree remove ../shop-hotfix',
+          why: '<strong>What this makes visible:</strong> removing a linked worktree removes its separate checkout, not the shared repository history.',
+          trees: { main: ['active', 'fix merged'], feature: ['active', 'resume feature'], hotfix: ['done', 'safe to remove'] }
+        }
+      ];
+      const strip = document.getElementById('story-strip');
+      const log = document.getElementById('lab-log');
+      const label = document.getElementById('lab-step-label');
+      const title = document.getElementById('scene-title');
+      const command = document.getElementById('lab-command');
+      const why = document.getElementById('lab-why');
+      const kicker = document.getElementById('scene-kicker');
+      const treeCards = [...document.querySelectorAll('.worktree-card')];
+      const state = { index: 0, timer: null };
+      function renderLab() {
+        const scene = scenes[state.index];
+        label.textContent = `step ${state.index + 1} of ${scenes.length} · ${scene.state}`;
+        kicker.textContent = `phase ${String(state.index + 1).padStart(2, '0')} · ${scene.phase}`;
+        title.textContent = scene.title;
+        log.textContent = scene.log;
+        command.textContent = scene.command;
+        why.innerHTML = scene.why;
+        treeCards.forEach(card => {
+          const [status, chip] = scene.trees[card.dataset.tree];
+          card.className = `worktree-card ${status}`;
+          card.querySelector('.tree-chip').textContent = chip;
+        });
+        strip.innerHTML = scenes.map((item, index) => `<button class="story-step ${index === state.index ? 'active' : ''}" type="button" data-scene="${index}" aria-current="${index === state.index ? 'step' : 'false'}"><span>${String(index + 1).padStart(2, '0')}</span>${item.phase}</button>`).join('');
+        strip.querySelectorAll('.story-step').forEach(button => button.addEventListener('click', () => { stop(); state.index = Number(button.dataset.scene); renderLab(); }));
+      }
+      function stop() { if (state.timer) clearInterval(state.timer); state.timer = null; }
+      function advance() { state.index = (state.index + 1) % scenes.length; renderLab(); }
+      function play() { stop(); const speed = Number(document.getElementById('speed').value); state.timer = setInterval(advance, 3200 / speed); }
+      document.getElementById('play').addEventListener('click', play);
+      document.getElementById('pause').addEventListener('click', stop);
+      document.getElementById('step').addEventListener('click', () => { stop(); advance(); });
+      document.getElementById('reset').addEventListener('click', () => { stop(); state.index = 0; renderLab(); });
+      document.getElementById('speed').addEventListener('change', () => { if (state.timer) play(); });
+      renderLab();
+    })();
+  </script>
+</body>
+</html>

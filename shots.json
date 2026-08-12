@@ -1,0 +1,13 @@
+{
+  "url": "http://127.0.0.1:4173",
+  "out": "/tmp/git-worktrees-presentation-shots",
+  "viewport": { "width": 1440, "height": 900 },
+  "colorScheme": "light",
+  "settle": 250,
+  "shots": [
+    { "name": "01-title", "steps": [{ "wait": "h1" }] },
+    { "name": "02-live-lab", "steps": [{ "goto": "#worktree-lab" }, { "wait": "#worktree-lab" }, { "click": "#step" }, { "sleep": 150 }] },
+    { "name": "03-title-dark", "steps": [{ "wait": "h1" }], "colorScheme": "dark" },
+    { "name": "04-mobile", "steps": [{ "wait": "h1" }], "viewports": [390, 768] }
+  ]
+}
