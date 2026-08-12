@@ -8,6 +8,10 @@ An interactive, browser-based presentation on Git worktrees. It explains the sha
 
 https://namuan.github.io/git-worktrees-presentation/
 
+## Cheatsheet
+
+Looking for commands rather than the presentation? See the [Git worktrees command cheatsheet](CHEATSHEET.md).
+
 ## Learning objective
 
 Understand that a worktree is an additional working directory attached to one Git repository: it has separate checked-out files, `HEAD`, and index, while sharing repository history and most common Git data. The deck walks through an incident (feature in progress → urgent hotfix → cleanup) with an interactive visual model of the shared repo and its worktree directories.
